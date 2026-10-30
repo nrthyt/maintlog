@@ -2,12 +2,26 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db/db'
 import { addVehicle, deleteVehicle, updateVehicle, type VehicleInput } from './db/vehicles'
-import { meterUnitFor, vehicleKindLabel } from './db/types'
+import {
+  addServiceRecord,
+  deleteServiceRecord,
+  listServiceRecords,
+  updateServiceRecord,
+  type ServiceRecordInput,
+} from './db/records'
+import { meterUnitFor, vehicleKindLabel, type ServiceRecord } from './db/types'
 import { VehicleList } from './components/VehicleList'
 import { VehicleForm } from './components/VehicleForm'
+import { ServiceRecordForm } from './components/ServiceRecordForm'
+import { ServiceRecordList } from './components/ServiceRecordList'
 import { ConfirmButton } from './components/ConfirmButton'
 
-type Panel = { type: 'none' } | { type: 'add-vehicle' } | { type: 'edit-vehicle' }
+type Panel =
+  | { type: 'none' }
+  | { type: 'add-vehicle' }
+  | { type: 'edit-vehicle' }
+  | { type: 'add-record' }
+  | { type: 'edit-record'; record: ServiceRecord }
 
 function App() {
   const vehicles = useLiveQuery(() => db.vehicles.orderBy('name').toArray(), [])
@@ -15,11 +29,19 @@ function App() {
   const [panel, setPanel] = useState<Panel>({ type: 'none' })
 
   const selected = vehicles?.find((v) => v.id === selectedId) ?? null
+  const records = useLiveQuery(
+    () => (selectedId === null ? Promise.resolve([]) : listServiceRecords(selectedId)),
+    [selectedId],
+  )
+
+  function selectVehicle(id: number | null) {
+    setSelectedId(id)
+    setPanel({ type: 'none' })
+  }
 
   async function handleAddVehicle(input: VehicleInput) {
     const id = await addVehicle(input)
-    setSelectedId(id)
-    setPanel({ type: 'none' })
+    selectVehicle(id)
   }
 
   async function handleUpdateVehicle(input: VehicleInput) {
@@ -31,8 +53,22 @@ function App() {
   async function handleDeleteVehicle() {
     if (!selected) return
     await deleteVehicle(selected.id)
-    setSelectedId(null)
+    selectVehicle(null)
+  }
+
+  async function handleAddRecord(input: ServiceRecordInput) {
+    await addServiceRecord(input)
     setPanel({ type: 'none' })
+  }
+
+  async function handleUpdateRecord(id: number, input: ServiceRecordInput) {
+    await updateServiceRecord(id, input)
+    setPanel({ type: 'none' })
+  }
+
+  async function handleDeleteRecord(id: number) {
+    await deleteServiceRecord(id)
+    if (panel.type === 'edit-record' && panel.record.id === id) setPanel({ type: 'none' })
   }
 
   return (
@@ -58,14 +94,7 @@ function App() {
           {vehicles === undefined ? (
             <p className="muted">Loading…</p>
           ) : (
-            <VehicleList
-              vehicles={vehicles}
-              selectedId={selectedId}
-              onSelect={(id) => {
-                setSelectedId(id)
-                setPanel({ type: 'none' })
-              }}
-            />
+            <VehicleList vehicles={vehicles} selectedId={selectedId} onSelect={selectVehicle} />
           )}
         </aside>
 
@@ -87,26 +116,76 @@ function App() {
             <p className="muted">Select a vehicle on the left, or add a new one.</p>
           )}
 
-          {panel.type === 'none' && selected && (
-            <section className="card" aria-label="Vehicle details">
-              <div className="card-head">
-                <div>
-                  <h2>{selected.name}</h2>
-                  <p className="muted">
-                    {vehicleKindLabel(selected.kind)}
-                    {selected.make || selected.model ? ` · ${[selected.make, selected.model].filter(Boolean).join(' ')}` : ''}
-                    {' · measured in '}
-                    {meterUnitFor(selected.kind)}
-                  </p>
+          {selected && panel.type !== 'add-vehicle' && panel.type !== 'edit-vehicle' && (
+            <>
+              <section className="card" aria-label="Vehicle details">
+                <div className="card-head">
+                  <div>
+                    <h2>{selected.name}</h2>
+                    <p className="muted">
+                      {vehicleKindLabel(selected.kind)}
+                      {selected.make || selected.model
+                        ? ` · ${[selected.make, selected.model].filter(Boolean).join(' ')}`
+                        : ''}
+                      {' · measured in '}
+                      {meterUnitFor(selected.kind)}
+                    </p>
+                  </div>
+                  <div className="actions">
+                    <button type="button" className="btn" onClick={() => setPanel({ type: 'edit-vehicle' })}>
+                      Edit
+                    </button>
+                    <ConfirmButton
+                      label="Delete"
+                      confirmLabel="Delete vehicle and its records"
+                      onConfirm={handleDeleteVehicle}
+                    />
+                  </div>
                 </div>
-                <div className="actions">
-                  <button type="button" className="btn" onClick={() => setPanel({ type: 'edit-vehicle' })}>
-                    Edit
+              </section>
+
+              {panel.type === 'add-record' && (
+                <ServiceRecordForm
+                  vehicle={selected}
+                  onSubmit={handleAddRecord}
+                  onCancel={() => setPanel({ type: 'none' })}
+                />
+              )}
+
+              {panel.type === 'edit-record' && (
+                <ServiceRecordForm
+                  key={panel.record.id}
+                  vehicle={selected}
+                  initial={panel.record}
+                  onSubmit={(input) => handleUpdateRecord(panel.record.id, input)}
+                  onCancel={() => setPanel({ type: 'none' })}
+                />
+              )}
+
+              <section aria-label="Service history">
+                <div className="sidebar-head">
+                  <h2>Service history</h2>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setPanel({ type: 'add-record' })}
+                    disabled={panel.type === 'add-record'}
+                  >
+                    Add record
                   </button>
-                  <ConfirmButton label="Delete" confirmLabel="Delete vehicle and its records" onConfirm={handleDeleteVehicle} />
                 </div>
-              </div>
-            </section>
+                {records === undefined ? (
+                  <p className="muted">Loading…</p>
+                ) : (
+                  <ServiceRecordList
+                    records={records}
+                    unit={meterUnitFor(selected.kind)}
+                    onEdit={(record) => setPanel({ type: 'edit-record', record })}
+                    onDelete={handleDeleteRecord}
+                  />
+                )}
+              </section>
+            </>
           )}
         </main>
       </div>
