@@ -1,0 +1,25 @@
+:root {
+  --text: #222;
+  --muted: #666;
+  --bg: #fafafa;
+  --surface: #fff;
+  --border: #ddd;
+  --accent: #2f6f4e;
+  --danger: #b3261e;
+
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem;
+}
