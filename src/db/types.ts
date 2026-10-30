@@ -5,8 +5,8 @@ export type VehicleKind = 'car' | 'boat' | 'outboard'
 export type MeterUnit = 'km' | 'hours'
 
 export interface Vehicle {
-  /** Auto-incremented primary key. Undefined until the record is stored. */
-  id?: number
+  /** Auto-incremented primary key, assigned by the database on insert. */
+  id: number
   kind: VehicleKind
   name: string
   /** Manufacturer, free text. Optional. */
@@ -18,8 +18,8 @@ export interface Vehicle {
 }
 
 export interface ServiceRecord {
-  /** Auto-incremented primary key. Undefined until the record is stored. */
-  id?: number
+  /** Auto-incremented primary key, assigned by the database on insert. */
+  id: number
   vehicleId: number
   /** Calendar date of the service, formatted as YYYY-MM-DD. */
   date: string
