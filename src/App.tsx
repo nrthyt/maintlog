@@ -9,7 +9,9 @@ import {
   updateServiceRecord,
   type ServiceRecordInput,
 } from './db/records'
+import { seedSampleData } from './db/seed'
 import { meterUnitFor, vehicleKindLabel, type ServiceRecord } from './db/types'
+import { EmptyState } from './components/EmptyState'
 import { VehicleList } from './components/VehicleList'
 import { VehicleForm } from './components/VehicleForm'
 import { ServiceRecordForm } from './components/ServiceRecordForm'
@@ -42,6 +44,11 @@ function App() {
   async function handleAddVehicle(input: VehicleInput) {
     const id = await addVehicle(input)
     selectVehicle(id)
+  }
+
+  async function handleLoadSample() {
+    const ids = await seedSampleData()
+    selectVehicle(ids[0] ?? null)
   }
 
   async function handleUpdateVehicle(input: VehicleInput) {
@@ -112,7 +119,11 @@ function App() {
             />
           )}
 
-          {panel.type === 'none' && !selected && (
+          {panel.type === 'none' && !selected && vehicles !== undefined && vehicles.length === 0 && (
+            <EmptyState onLoadSample={handleLoadSample} onAddVehicle={() => setPanel({ type: 'add-vehicle' })} />
+          )}
+
+          {panel.type === 'none' && !selected && vehicles !== undefined && vehicles.length > 0 && (
             <p className="muted">Select a vehicle on the left, or add a new one.</p>
           )}
 
